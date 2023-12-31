@@ -1,0 +1,2 @@
+spark-submit --master spark://spark-master:7077 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2,org.apache.hudi:hudi-spark-bundle_2.12:0.11.0 --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" --conf "spark.sql.hive.convertMetastoreParquet=false" --conf spark.driver.extraJavaOptions="-Divy.cache.dir=/tmp -Divy.home=/tmp" --conf "spark.executor.extraJavaOptions='-Dlog4j.configuration=log4j.properties'" --driver-memory 1G --executor-memory 2G /data/stream.py
+

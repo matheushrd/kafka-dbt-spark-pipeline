@@ -183,47 +183,69 @@ kafka_schema = StructType([
     ]), True)
 ])
 
-kafka_stream_df = spark\
-      .readStream \
-      .format("kafka") \
-      .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
-      .option("subscribe", kafka_topic) \
-      .option("startingOffsets", "earliest") \
-      .load()
+# kafka_stream_df = spark\
+#       .readStream \
+#       .format("kafka") \
+#       .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
+#       .option("subscribe", kafka_topic) \
+#       .option("startingOffsets", "earliest") \
+#       .load()
 
 
-# query = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
+
+kafka_stream_df = spark \
+  .readStream \
+  .format("kafka") \
+  .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
+  .option("subscribe",kafka_topic) \
+  .load() \
+  .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
+  .writeStream \
+  .format("console") \
+  .trigger(continuous="1 second") \
+  .start() \
+  .awaitTermination()
+
+
+# print(kafka_stream_df.printSchema())
+
+# query = kafka_stream_df.selectExpr("val") \
 #     .writeStream \
 #     .format("console") \
 #     .option("checkpointLocation", checkpoint_location) \
 #     .start()
 
 # query.awaitTermination()
-(kafka_stream_df.printSchema)
+
+# query = kafka_stream_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
+#     .writeStream \
+#     .format("console") \
+#     .option("checkpointLocation", checkpoint_location) \
+#     .start()
 
 # Extract the JSON payload as a map
-json_data = kafka_stream_df.select(from_json(col("value").cast("string"), generic_schema).alias("data")).select("data.json")
+# json_data = kafka_stream_df.select(from_json(col("value").cast("string"), generic_schema).alias("data")).select("data.json")
 
 
 
-minio_write_query = (
-    json_data 
-    .writeStream
-    .format("hudi")
-    .outputMode("append")
-    .option("hoodie.table.name", "usuarios")
-    .option("hoodie.datasource.write.recordkey.field", "id")
-    .option("hoodie.datasource.write.partitionpath.field", "ts")
-    .option("hoodie.datasource.write.precombine.field", "timestamp")
-    .option("hoodie.datasource.write.operation", "upsert")
-    .option("checkpointLocation", checkpoint_location)
-    .option("newRows", 10)
-    .option("endpoint", minio_endpoint)
-    .option("accessKey", minio_access_key)
-    .option("secretKey", minio_secret_key)
-    .option("bucket", minio_bucket)
-    .option("path", minio_path)
-    .start()
-)
+# minio_write_query = (
+#     json_data 
+#     .writeStream
+#     .format("hudi")
+#     .outputMode("append")
+#     .option("hoodie.table.name", "usuarios")
+#     .option("hoodie.datasource.write.recordkey.field", "id")
+#     .option("hoodie.datasource.write.partitionpath.field", "ts")
+#     .option("hoodie.datasource.write.precombine.field", "timestamp")
+#     .option("hoodie.datasource.write.operation", "upsert")
+#     .option("checkpointLocation", checkpoint_location)
+#     .option("newRows", 10)
+#     .option("endpoint", minio_endpoint)
+#     .option("accessKey", minio_access_key)
+#     .option("secretKey", minio_secret_key)
+#     .option("bucket", minio_bucket)
+#     .option("path", minio_path)
+#     .start()
+# )
 
-minio_write_query.awaitTermination()
+# minio_write_query.awaitTermination()
