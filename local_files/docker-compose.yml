@@ -1,0 +1,248 @@
+version: '3'
+
+services:
+  postgres:
+    image: postgres:latest
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.2
+
+  kafka:
+    image: bitnami/kafka:latest
+    restart: unless-stopped
+    ports:
+      - 9093:9093
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+      - KAFKA_CONNECT_PLUGIN_PATH=/home/kafka/pluginss
+      - KAFKA_CONNECT_CONFLUENT_SUPPORT_METRICS_ENABLE=false
+      - KAFKA_CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR=1
+      - KAFKA_CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR=1
+      - KAFKA_CONNECT_STATUS_STORAGE_REPLICATION_FACTOR=1
+      - KAFKA_CONNECT_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - KAFKA_CONNECT_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - KAFKA_CONNECT_INTERNAL_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - KAFKA_CONNECT_INTERNAL_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - KAFKA_CONNECT_CONFIG_STORAGE_TOPIC=my_connect_configs
+      - KAFKA_CONNECT_OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - KAFKA_CONNECT_STATUS_STORAGE_TOPIC=my_connect_statuses
+      - listeners=PLAINTEXT://localhost:9092
+    depends_on:
+      - zookeeper
+      - spark-master
+    volumes:
+      - ./confluentinc-kafka-connect-s3-10.5.0/lib:/home/kafka/plugins
+      - ./connector.properties:/home/kafka/plugins/connector.properties
+      - ./s3-sink.properties:/home/kafka/plugins/s3-sink.properties
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.3
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    ports:
+      - 2181:2181
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.4
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+      - zookeeper
+    ports:
+      - 8080:8080
+    restart: always
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=teste_damasceno
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+      - KAFKA_UI_HOSTNAME=http://localhost:8080
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.5
+
+  debezium:
+    image: debezium/connect:1.8
+    ports:
+      - "8083:8083"
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
+      - KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - INTERNAL_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - INTERNAL_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - CONFIG_STORAGE_REPLICATION_FACTOR=1
+      - OFFSET_STORAGE_REPLICATION_FACTOR=1
+      - STATUS_STORAGE_REPLICATION_FACTOR=1
+    depends_on:
+      - kafka
+      - postgres
+    volumes:
+      - ./debezium-config.json:/debezium/config/debezium-config.json
+      - ./worker.properties:/debezium/config/worker.properties
+      - ./s3-sink.properties:/debezium/config/s3-sink.properties
+      - ./confluentinc-kafka-connect-s3-10.5.0/:/kafka/connect/confluentic-s3-connector/
+      - ./connector.properties:/home/kafka/plugins/connector.properties
+      - ./s3-sink.properties:/home/kafka/plugins/s3-sink.properties
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.6
+
+  x-minio-common: &minio-common
+    image: quay.io/minio/minio:RELEASE.2023-12-20T01-00-02Z
+    command: server --console-address ":9001" http://minio{1...4}/data{1...2}
+    expose:
+      - "9000"
+      - "9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.7
+
+  minio1:
+    <<: *minio-common
+    hostname: minio1
+    volumes:
+      - data1-1:/data1
+      - data1-2:/data2
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.8
+
+  minio2:
+    <<: *minio-common
+    hostname: minio2
+    volumes:
+      - data2-1:/data1
+      - data2-2:/data2
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.9
+
+  minio3:
+    <<: *minio-common
+    hostname: minio3
+    volumes:
+      - data3-1:/data1
+      - data3-2:/data2
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.10
+
+  minio4:
+    <<: *minio-common
+    hostname: minio4
+    volumes:
+      - data4-1:/data1
+      - data4-2:/data2
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.11
+
+  nginx:
+    image: nginx:1.19.2-alpine
+    hostname: nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    depends_on:
+      - minio1
+      - minio2
+      - minio3
+      - minio4
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.12
+
+  spark-master:
+    image: bitnami/spark:3.2.4
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_MASTER_WEBUI_PORT=7070
+      - SPARK_MASTER_PORT=7077
+    ports:
+      - "7070:7070"
+      - "7077:7077"
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.13
+    volumes:
+      - ./data:/data
+    user: 'root'
+
+  spark-worker:
+    image: bitnami/spark:3.2.4
+    container_name: spark-worker-1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark-master:7077
+      - SPARK_WORKER_CORES=3
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_WORKER_PORT=7078
+      - SPARK_WORKER_WEBUI_PORT=7171
+      - SPARK_USER=spark
+    ports:
+      - "7171:7171"
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.14
+    volumes:
+      - ./data:/data
+
+networks:
+  spark-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.0.0/24
+
+volumes:
+  postgres_data:
+  data1-1:
+  data1-2:
+  data2-1:
+  data2-2:
+  data3-1:
+  data3-2:
+  data4-1:
+  data4-2:

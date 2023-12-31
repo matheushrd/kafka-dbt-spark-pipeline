@@ -1,0 +1,22 @@
+{
+  "name": "usuario_usuario_connector",
+  "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+      "plugin.name": "pgoutput",
+      "database.hostname": "postgres",
+      "database.port": "5432",
+      "database.user": "myuser",
+      "database.password": "mypassword",
+      "database.dbname": "mydatabase",
+      "database.server.name": "postgres",
+      "table.include.list": "usuario.usuario",
+      "snapshot.mode": "initial",
+      "snapshot.minimal.locking": true,
+      "max.batch.size": 100,
+      "topic.creation.default.replication.factor": 1,
+      "topic.creation.default.partitions": 3,
+      "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "producer.bootstrap.servers": "kafka:9092"
+  }
+}

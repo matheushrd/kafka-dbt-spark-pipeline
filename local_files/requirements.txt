@@ -1,0 +1,5 @@
+delta-spark==2.4.0
+deltalake
+jupyterlab==4.0.0
+pandas
+pyspark==3.4.1
