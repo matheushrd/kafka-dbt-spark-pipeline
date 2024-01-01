@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col
+from pyspark.sql.functions import from_json, col, from_unixtime, col, year, month, dayofmonth
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, BooleanType, MapType
 import logging
 
@@ -32,10 +32,6 @@ spark = SparkSession.builder \
     .appName("HudiKafkaConsumer") \
     .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.0.1')\
     .getOrCreate()
-    # .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-    # .config("spark.sql.hive.convertMetastoreParquet", "false") \
-    # .config("spark.hadoop.fs.s3a.multipart.size", "104857600") \
-    # .config("spark.sql.streaming.checkpointLocation", checkpoint_location) \
 
 
 # Define the schema for the incoming Kafka messages
@@ -43,54 +39,6 @@ print("Spark Sartted")
 # Define the schema for the message
 schema = StructType([
     StructField("schema", StructType([
-        StructField("type", StringType(), False),
-        StructField("fields", StructType([
-            StructField("before", StructType([
-                StructField("id", StringType(), False),
-                StructField("nome", StringType(), True),
-                StructField("sobrenome", StringType(), True),
-                StructField("idade", IntegerType(), True),
-                StructField("telefone", StringType(), True),
-                StructField("email", StringType(), True),
-                StructField("created_at", LongType(), True),
-                StructField("updated_at", LongType(), True),
-            ]), True),
-            StructField("after", StructType([
-                StructField("id", StringType(), False),
-                StructField("nome", StringType(), True),
-                StructField("sobrenome", StringType(), True),
-                StructField("idade", IntegerType(), True),
-                StructField("telefone", StringType(), True),
-                StructField("email", StringType(), True),
-                StructField("created_at", LongType(), True),
-                StructField("updated_at", LongType(), True),
-            ]), True),
-            StructField("source", StructType([
-                StructField("version", StringType(), False),
-                StructField("connector", StringType(), False),
-                StructField("name", StringType(), False),
-                StructField("ts_ms", LongType(), False),
-                StructField("snapshot", StringType(), True),
-                StructField("db", StringType(), False),
-                StructField("sequence", StringType(), True),
-                StructField("schema", StringType(), False),
-                StructField("table", StringType(), False),
-                StructField("txId", LongType(), True),
-                StructField("lsn", LongType(), True),
-                StructField("xmin", LongType(), True),
-            ]), False),
-            StructField("op", StringType(), False),
-            StructField("ts_ms", LongType(), True),
-            StructField("transaction", StructType([
-                StructField("id", StringType(), False),
-                StructField("total_order", LongType(), False),
-                StructField("data_collection_order", LongType(), False),
-            ]), True),
-        ]), False),
-        StructField("optional", BooleanType(), False),
-        StructField("name", StringType(), False),
-    ]), False),
-    StructField("payload", StructType([
         StructField("before", StructType([
             StructField("id", StringType(), False),
             StructField("nome", StringType(), True),
@@ -99,7 +47,7 @@ schema = StructType([
             StructField("telefone", StringType(), True),
             StructField("email", StringType(), True),
             StructField("created_at", LongType(), True),
-            StructField("updated_at", LongType(), True),
+            StructField("updated_at", LongType(), True)
         ]), True),
         StructField("after", StructType([
             StructField("id", StringType(), False),
@@ -109,7 +57,7 @@ schema = StructType([
             StructField("telefone", StringType(), True),
             StructField("email", StringType(), True),
             StructField("created_at", LongType(), True),
-            StructField("updated_at", LongType(), True),
+            StructField("updated_at", LongType(), True)
         ]), True),
         StructField("source", StructType([
             StructField("version", StringType(), False),
@@ -123,76 +71,95 @@ schema = StructType([
             StructField("table", StringType(), False),
             StructField("txId", LongType(), True),
             StructField("lsn", LongType(), True),
-            StructField("xmin", LongType(), True),
+            StructField("xmin", LongType(), True)
         ]), False),
         StructField("op", StringType(), False),
         StructField("ts_ms", LongType(), True),
         StructField("transaction", StructType([
             StructField("id", StringType(), False),
             StructField("total_order", LongType(), False),
-            StructField("data_collection_order", LongType(), False),
+            StructField("data_collection_order", LongType(), False)
+        ]), True)
+    ]), False),
+    StructField("payload", StructType([
+        StructField("before", StructType([
+            StructField("id", StringType(), True),
+            StructField("nome", StringType(), True),
+            StructField("sobrenome", StringType(), True),
+            StructField("idade", IntegerType(), True),
+            StructField("telefone", StringType(), True),
+            StructField("email", StringType(), True),
+            StructField("created_at", LongType(), True),
+            StructField("updated_at", LongType(), True)
         ]), True),
-    ]), False),
-])
-# Create a Kafka DataFrame
-
-kafka_schema = StructType([
-    StructField("before", StructType([
-        StructField("id", StringType(), False),
-        StructField("nome", StringType(), True),
-        StructField("sobrenome", StringType(), True),
-        StructField("idade", IntegerType(), True),
-        StructField("telefone", StringType(), True),
-        StructField("email", StringType(), True),
-        StructField("created_at", LongType(), True),
-        StructField("updated_at", LongType(), True)
-    ]), True),
-    
-    StructField("after", StructType([
-        StructField("id", StringType(), False),
-        StructField("nome", StringType(), True),
-        StructField("sobrenome", StringType(), True),
-        StructField("idade", IntegerType(), True),
-        StructField("telefone", StringType(), True),
-        StructField("email", StringType(), True),
-        StructField("created_at", LongType(), True),
-        StructField("updated_at", LongType(), True)
-    ]), True),
-    
-    StructField("source", StructType([
-        StructField("version", StringType(), False),
-        StructField("connector", StringType(), False),
-        StructField("name", StringType(), False),
-        StructField("ts_ms", LongType(), False),
-        StructField("snapshot", StringType(), True),
-        StructField("db", StringType(), False),
-        StructField("sequence", StringType(), True),
-        StructField("schema", StringType(), False),
-        StructField("table", StringType(), False),
-        StructField("txId", LongType(), True),
-        StructField("lsn", LongType(), True),
-        StructField("xmin", LongType(), True)
-    ]), False),
-    
-    StructField("op", StringType(), False),
-    StructField("ts_ms", LongType(), True),
-    
-    StructField("transaction", StructType([
-        StructField("id", StringType(), False),
-        StructField("total_order", LongType(), False),
-        StructField("data_collection_order", LongType(), False)
-    ]), True)
+        StructField("after", StructType([
+            StructField("id", StringType(), True),
+            StructField("nome", StringType(), True),
+            StructField("sobrenome", StringType(), True),
+            StructField("idade", IntegerType(), True),
+            StructField("telefone", StringType(), True),
+            StructField("email", StringType(), True),
+            StructField("created_at", LongType(), True),
+            StructField("updated_at", LongType(), True)
+        ]), True),
+        StructField("source", StructType([
+            StructField("version", StringType(), False),
+            StructField("connector", StringType(), False),
+            StructField("name", StringType(), False),
+            StructField("ts_ms", LongType(), False),
+            StructField("snapshot", StringType(), True),
+            StructField("db", StringType(), False),
+            StructField("sequence", StringType(), True),
+            StructField("schema", StringType(), False),
+            StructField("table", StringType(), False),
+            StructField("txId", LongType(), True),
+            StructField("lsn", LongType(), True),
+            StructField("xmin", LongType(), True)
+        ]), False),
+        StructField("op", StringType(), False),
+        StructField("ts_ms", LongType(), True),
+        StructField("transaction", StructType([
+            StructField("id", StringType(), False),
+            StructField("total_order", LongType(), False),
+            StructField("data_collection_order", LongType(), False)
+        ]), True)
+    ]), False)
 ])
 
-# kafka_stream_df = spark\
-#       .readStream \
-#       .format("kafka") \
-#       .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
-#       .option("subscribe", kafka_topic) \
-#       .option("startingOffsets", "earliest") \
-#       .load()
+
+payload_schema = StructType(
+    [
+        StructField("after", StructType([
+            StructField("id", StringType(), True),
+            StructField("nome", StringType(), True),
+            StructField("sobrenome", StringType(), True),
+            StructField("idade", IntegerType(), True),
+            StructField("telefone", StringType(), True),
+            StructField("email", StringType(), True),
+            StructField("created_at", LongType(), True),
+            StructField("updated_at", LongType(), True)
+        ]), True),
+        StructField("source", StructType([
+            StructField("version", StringType(), False),
+            StructField("connector", StringType(), False),
+            StructField("name", StringType(), False),
+            StructField("ts_ms", LongType(), False),
+            StructField("snapshot", StringType(), True),
+            StructField("db", StringType(), False),
+            StructField("sequence", StringType(), True),
+            StructField("schema", StringType(), False),
+            StructField("table", StringType(), False),
+            StructField("txId", LongType(), True),
+            StructField("lsn", LongType(), True),
+            StructField("xmin", LongType(), True)
+        ]), False),
+        StructField("op", StringType(), False),
+        StructField("ts_ms", LongType(), True)
+    ]
+)
 
 
+###### QUERY PRINT CONSOLE
 
 # kafka_stream_df = spark \
 #   .readStream \
@@ -202,12 +169,48 @@ kafka_schema = StructType([
 #   .load() \
 #   .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
 #   .writeStream \
+#   .option("truncate", "false") \
 #   .format("console") \
 #   .trigger(continuous="1 second") \
 #   .start() \
 #   .awaitTermination()
 
+#.select("after.id, after.nome, after.sobrenome, after.idade, after.telefone, after.email, after.created_at, after.updated_at , op, ts_ms") \
 
+
+# kafka_stream_df = spark \
+#   .readStream \
+#   .format("kafka") \
+#   .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
+#   .option("subscribe",kafka_topic) \
+#   .load() \
+#   .selectExpr("CAST(value AS STRING) as value_string") \
+#   .select(from_json("value_string", schema).alias("value_struct")) \
+#   .select(
+#       "value_struct.payload.after.id",
+#        "value_struct.payload.after.nome",
+#        "value_struct.payload.after.sobrenome",
+#        "value_struct.payload.after.idade",
+#        "value_struct.payload.after.telefone",
+#        "value_struct.payload.after.email",
+#        "value_struct.payload.after.created_at",
+#        "value_struct.payload.after.updated_at",
+#        "value_struct.payload.op",
+#        "value_struct.payload.ts_ms"
+#   ) \
+#   .withColumn("ts_unix", col("ts_ms") / 1000) \
+#   .withColumn("year", year(from_unixtime("ts_unix"))) \
+#   .withColumn("month", month(from_unixtime("ts_unix"))) \
+#   .withColumn("day", dayofmonth(from_unixtime("ts_unix"))) \
+#   .writeStream \
+#   .option("truncate", "false") \
+#   .format("console") \
+#   .trigger(continuous="2 seconds") \
+#   .start() \
+#   .awaitTermination()
+
+
+# ##### QUERY WRITE MINIO
 kafka_stream_df = spark \
     .readStream \
     .format("kafka") \
@@ -215,15 +218,32 @@ kafka_stream_df = spark \
     .option("subscribe",kafka_topic) \
     .option("failOnDataLoss", False) \
     .load() \
-    .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
+    .selectExpr("CAST(value AS STRING) as value_string") \
+    .select(from_json("value_string", schema).alias("value_struct")) \
+    .select(
+      "value_struct.payload.after.id",
+       "value_struct.payload.after.nome",
+       "value_struct.payload.after.sobrenome",
+       "value_struct.payload.after.idade",
+       "value_struct.payload.after.telefone",
+       "value_struct.payload.after.email",
+       "value_struct.payload.after.created_at",
+       "value_struct.payload.after.updated_at",
+       "value_struct.payload.op",
+       "value_struct.payload.ts_ms"
+    ) \
+    .withColumn("ts_unix", col("ts_ms") / 1000) \
+    .withColumn("year", year(from_unixtime("ts_unix"))) \
+    .withColumn("month", month(from_unixtime("ts_unix"))) \
+    .withColumn("day", dayofmonth(from_unixtime("ts_unix"))) \
     .writeStream \
     .format("hudi") \
     .trigger(processingTime="2 seconds") \
     .option("checkpointLocation", checkpoint_location) \
     .option("hoodie.table.name", "usuarios") \
-    .option("hoodie.datasource.write.recordkey.field", "key") \
-    .option("hoodie.datasource.write.partitionpath.field", "value") \
-    .option("hoodie.datasource.write.precombine.field", "value") \
+    .option("hoodie.datasource.write.recordkey.field", "id") \
+    .option("hoodie.datasource.write.partitionpath.field", "year,month,day") \
+    .option("hoodie.datasource.write.precombine.field", "ts_ms") \
     .option("hoodie.datasource.write.operation", "upsert") \
     .option("path", f's3a://{minio_bucket}/{minio_path}') \
     .outputMode("append") \
@@ -231,45 +251,3 @@ kafka_stream_df = spark \
     .awaitTermination()
 
     
-# print(kafka_stream_df.printSchema())
-
-# query = kafka_stream_df.selectExpr("val") \
-#     .writeStream \
-#     .format("console") \
-#     .option("checkpointLocation", checkpoint_location) \
-#     .start()
-
-# query.awaitTermination()
-
-# query = kafka_stream_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
-#     .writeStream \
-#     .format("console") \
-#     .option("checkpointLocation", checkpoint_location) \
-#     .start()
-
-# Extract the JSON payload as a map
-# json_data = kafka_stream_df.select(from_json(col("value").cast("string"), generic_schema).alias("data")).select("data.json")
-
-
-
-# minio_write_query = (
-#     json_data 
-#     .writeStream
-#     .format("hudi")
-#     .outputMode("append")
-#     .option("hoodie.table.name", "usuarios")
-#     .option("hoodie.datasource.write.recordkey.field", "id")
-#     .option("hoodie.datasource.write.partitionpath.field", "ts")
-#     .option("hoodie.datasource.write.precombine.field", "timestamp")
-#     .option("hoodie.datasource.write.operation", "upsert")
-#     .option("checkpointLocation", checkpoint_location)
-#     .option("newRows", 10)
-#     .option("endpoint", minio_endpoint)
-#     .option("accessKey", minio_access_key)
-#     .option("secretKey", minio_secret_key)
-#     .option("bucket", minio_bucket)
-#     .option("path", minio_path)
-#     .start()
-# )
-
-# minio_write_query.awaitTermination()
