@@ -189,7 +189,7 @@ services:
         ipv4_address: 172.18.0.12
 
   spark-master:
-    image: bitnami/spark:3.2.4
+    image: bitnami/spark:3.3
     container_name: spark-master
     environment:
       - SPARK_MODE=master
@@ -208,7 +208,7 @@ services:
     user: 'root'
 
   spark-worker:
-    image: bitnami/spark:3.2.4
+    image: bitnami/spark:3.3
     container_name: spark-worker-1
     environment:
       - SPARK_MODE=worker

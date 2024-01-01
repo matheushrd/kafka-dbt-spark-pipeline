@@ -16,7 +16,7 @@ kafka_topic = "postgres.usuario.usuario"
 kafka_bootstrap_servers = "172.18.0.3:9092"
 
 # Define MinIO parameters
-minio_endpoint = "http://172.18.0.7:9000"  # Use the MinIO container's IP and port
+minio_endpoint = "http://172.18.0.8:9000"  # Use the MinIO container's IP and port
 minio_access_key = "5T4gRXIIeRDm0sf6tyel"
 minio_secret_key = "6FKOQXb45ft5XwCAtdKUfhE53BxUCw1Cf2CaZCg6"
 minio_bucket = "usuario-database"
@@ -31,11 +31,12 @@ print('Starting Spark')
 spark = SparkSession.builder \
     .appName("HudiKafkaConsumer") \
     .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.0.1')\
-    .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-    .config("spark.sql.hive.convertMetastoreParquet", "false") \
-    .config("spark.hadoop.fs.s3a.multipart.size", "104857600") \
-    .config("spark.sql.streaming.checkpointLocation", checkpoint_location) \
     .getOrCreate()
+    # .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
+    # .config("spark.sql.hive.convertMetastoreParquet", "false") \
+    # .config("spark.hadoop.fs.s3a.multipart.size", "104857600") \
+    # .config("spark.sql.streaming.checkpointLocation", checkpoint_location) \
+
 
 # Define the schema for the incoming Kafka messages
 print("Spark Sartted")
@@ -193,20 +194,43 @@ kafka_schema = StructType([
 
 
 
+# kafka_stream_df = spark \
+#   .readStream \
+#   .format("kafka") \
+#   .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
+#   .option("subscribe",kafka_topic) \
+#   .load() \
+#   .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
+#   .writeStream \
+#   .format("console") \
+#   .trigger(continuous="1 second") \
+#   .start() \
+#   .awaitTermination()
+
+
 kafka_stream_df = spark \
-  .readStream \
-  .format("kafka") \
-  .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
-  .option("subscribe",kafka_topic) \
-  .load() \
-  .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
-  .writeStream \
-  .format("console") \
-  .trigger(continuous="1 second") \
-  .start() \
-  .awaitTermination()
+    .readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
+    .option("subscribe",kafka_topic) \
+    .option("failOnDataLoss", False) \
+    .load() \
+    .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
+    .writeStream \
+    .format("hudi") \
+    .trigger(processingTime="2 seconds") \
+    .option("checkpointLocation", checkpoint_location) \
+    .option("hoodie.table.name", "usuarios") \
+    .option("hoodie.datasource.write.recordkey.field", "key") \
+    .option("hoodie.datasource.write.partitionpath.field", "value") \
+    .option("hoodie.datasource.write.precombine.field", "value") \
+    .option("hoodie.datasource.write.operation", "upsert") \
+    .option("path", f's3a://{minio_bucket}/{minio_path}') \
+    .outputMode("append") \
+    .start() \
+    .awaitTermination()
 
-
+    
 # print(kafka_stream_df.printSchema())
 
 # query = kafka_stream_df.selectExpr("val") \
