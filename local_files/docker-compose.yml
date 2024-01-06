@@ -225,10 +225,6 @@ services:
     networks:
       spark-network:
         ipv4_address: 172.18.0.14
-    volumes:
-      - ./data:/data
-    depends_on:
-      - debezium
 
 networks:
   spark-network:
