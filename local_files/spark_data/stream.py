@@ -210,6 +210,11 @@ payload_schema = StructType(
 #   .awaitTermination()
 
 
+delete_statement = f"""
+    DELETE FROM usuarios
+    WHERE op = 'd'
+"""
+
 # ##### QUERY WRITE MINIO
 kafka_stream_df = spark \
     .readStream \

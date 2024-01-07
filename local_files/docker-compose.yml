@@ -2,6 +2,7 @@ version: '3'
 
 services:
   postgres:
+    container_name: postgresdb
     image: postgres:latest
     restart: unless-stopped
     ports:
@@ -18,6 +19,7 @@ services:
         ipv4_address: 172.18.0.2
 
   kafka:
+    container_name: kafka
     image: bitnami/kafka:latest
     restart: unless-stopped
     ports:
@@ -46,15 +48,12 @@ services:
     depends_on:
       - zookeeper
       - spark-master
-    volumes:
-      - ./confluentinc-kafka-connect-s3-10.5.0/lib:/home/kafka/plugins
-      - ./connector.properties:/home/kafka/plugins/connector.properties
-      - ./s3-sink.properties:/home/kafka/plugins/s3-sink.properties
     networks:
       spark-network:
         ipv4_address: 172.18.0.3
 
   zookeeper:
+    container_name: zookeeper
     image: bitnami/zookeeper:latest
     ports:
       - 2181:2181
@@ -64,25 +63,26 @@ services:
       spark-network:
         ipv4_address: 172.18.0.4
 
-  kafka-ui:
-    image: provectuslabs/kafka-ui
-    container_name: kafka-ui
-    depends_on:
-      - kafka
-      - zookeeper
-    ports:
-      - 8080:8080
-    restart: always
-    environment:
-      - KAFKA_CLUSTERS_0_NAME=teste_damasceno
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
-      - KAFKA_UI_HOSTNAME=http://localhost:8080
-    networks:
-      spark-network:
-        ipv4_address: 172.18.0.5
+  # kafka-ui:
+  #   image: provectuslabs/kafka-ui
+  #   container_name: kafka-ui
+  #   depends_on:
+  #     - kafka
+  #     - zookeeper
+  #   ports:
+  #     - 8080:8080
+  #   restart: always
+  #   environment:
+  #     - KAFKA_CLUSTERS_0_NAME=teste_damasceno
+  #     - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+  #     - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+  #     - KAFKA_UI_HOSTNAME=http://localhost:8080
+  #   networks:
+  #     spark-network:
+  #       ipv4_address: 172.18.0.5
 
   debezium:
+    container_name: debezium
     image: debezium/connect:1.8
     ports:
       - "8083:8083"
@@ -104,11 +104,6 @@ services:
       - postgres
     volumes:
       - ./debezium-config.json:/debezium/config/debezium-config.json
-      - ./worker.properties:/debezium/config/worker.properties
-      - ./s3-sink.properties:/debezium/config/s3-sink.properties
-      - ./confluentinc-kafka-connect-s3-10.5.0/:/kafka/connect/confluentic-s3-connector/
-      - ./connector.properties:/home/kafka/plugins/connector.properties
-      - ./s3-sink.properties:/home/kafka/plugins/s3-sink.properties
     networks:
       spark-network:
         ipv4_address: 172.18.0.6
@@ -204,12 +199,13 @@ services:
       spark-network:
         ipv4_address: 172.18.0.13
     volumes:
-      - ./data:/data
+      - ./spark_data:/data
     user: 'root'
 
   spark-worker:
     image: bitnami/spark:3.3
-    container_name: spark-worker-1
+    container_name: spark-worker
+    hostname: spark
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark-master:7077
@@ -225,6 +221,111 @@ services:
     networks:
       spark-network:
         ipv4_address: 172.18.0.14
+
+  trino-coordinator:
+    container_name: trino
+    image: trinodb/trino:latest
+    hostname: trino-coordinator
+    environment:
+      - TRINO_ENVIRONMENT=production
+    ports:
+      - 8080:8080
+    volumes:
+      - $PWD/volumes/trino/etc:/etc/trino
+    networks:
+      spark-network:
+       ipv4_address: 172.18.0.18
+    # command:
+    #   - /bin/bash
+    #   - -c 
+    #   - |
+    #     find /usr/lib/trino -name alluxio*shaded* -exec rm {} \;
+    #     cp /tmp/alluxio-files/alluxio-enterprise-*-client.jar /usr/lib/trino/plugin/hive/
+    #     cp /tmp/alluxio-files/alluxio-enterprise-*-client.jar /usr/lib/trino/plugin/hudi/
+    #     cp /tmp/alluxio-files/alluxio-enterprise-*-client.jar /usr/lib/trino/plugin/iceberg/
+    #     cp /tmp/alluxio-files/alluxio-enterprise-*-client.jar /usr/lib/trino/plugin/delta-lake/
+    #     cp -R /tmp/etc-trino/* /etc/trino/
+    #     cp /tmp/alluxio-files/alluxio-core-site.xml /etc/trino/core-site.xml
+    #     mkdir -p /home/trino && chown trino:trino /home/trino
+    #     /usr/lib/trino/bin/run-trino
+
+  # trino-worker:
+  #   image: trinodb/trino:latest
+  #   container_name: trino-worker
+  #   hostname: trino-worker
+  #   environment:
+  #     - TRINO_ENVIRONMENT=production
+  #     - TRINO_DISCOVERY_URI=localhost:8080
+  #   volumes:
+  #     - $PWD/volumes/trino/etc:/etc/trino
+  #   networks:
+  #      spark-network:
+  #       ipv4_address: 172.18.0.19
+
+  mariadb:
+    container_name: mariadb
+    hostname: mariadb
+    image: mariadb:10.5.8
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_USER=dbuser
+      - MYSQL_PASSWORD=dbpassword
+      - MYSQL_DATABASE=schema_registry
+    networks:
+      spark-network:
+       ipv4_address: 172.18.0.21
+
+  hive-metastore:
+    container_name: hive-metastore
+    hostname: hive-metastore
+    image: 'bitsondatadev/hive-metastore:latest'
+    ports:
+      - 9083:9083 # Metastore Thrift
+    volumes:
+      - $PWD/volumes/hive/conf/metastore-site.xml:/opt/apache-hive-metastore-3.0.0-bin/conf/metastore-site.xml:ro
+    environment:
+      - METASTORE_DB_HOSTNAME=mariadb
+    depends_on:
+      - mariadb
+    networks:
+      spark-network:
+       ipv4_address: 172.18.0.22
+    # entrypoint: >
+    #   /bin/sh -c "
+    #     cp /tmp/alluxio-files/alluxio-enterprise-*-client.jar /opt/apache-hive-metastore-3.0.0-bin/lib/
+    #     echo '#### Hive /opt/apache-hive-metastore-3.0.0-bin/lib/ ###'
+    #     ls -al /opt/apache-hive-metastore-3.0.0-bin/lib/ | grep alluxio
+    #     /entrypoint.sh
+    #     "
+  # trinodb:
+  #   image: trinodb/trino:latest
+  #   container_name: trinodb
+  #   ports:
+  #     - 8080:8080
+  #   volumes:
+  #     #- ./etc:/usr/lib/trino/etc:ro
+  #     - ./etc:/usr/lib/trino/plugin
+  #   #   - ./trino_files/config.properties:/data/trino/etc/config.properties
+  #   # #user: 'root'
+  #   networks:
+  #     spark-network:
+  #       ipv4_address: 172.18.0.15
+
+  # hive-metastore:
+  #   hostname: hive-metastore
+  #   image: 'bitsondatadev/hive-metastore:latest'
+  #   ports:
+  #     - '9083:9083' # Metastore Thrift
+  #   volumes:
+  #     - ./conf/metastore-site.xml:/opt/apache-hive-metastore-3.0.0-bin/conf/metastore-site.xml:ro
+  #   environment:
+  #     METASTORE_DB_HOSTNAME: mariadb
+  #   networks:
+  #     spark-network:
+  #       ipv4_address: 172.18.0.16
+
 
 networks:
   spark-network:
