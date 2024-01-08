@@ -125,7 +125,7 @@ services:
     networks:
       spark-network:
         ipv4_address: 172.18.0.7
-
+    
   minio1:
     <<: *minio-common
     hostname: minio1
