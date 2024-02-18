@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.26.0 (40646f47)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: debezium
+  name: debezium
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: debezium
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert
+        kompose.version: 1.26.0 (40646f47)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/spark-network: "true"
+        io.kompose.service: debezium
+    spec:
+      containers:
+        - env:
+            - name: BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: CONFIG_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: CONFIG_STORAGE_TOPIC
+              value: my_connect_configs
+            - name: GROUP_ID
+              value: "1"
+            - name: INTERNAL_KEY_CONVERTER
+              value: org.apache.kafka.connect.json.JsonConverter
+            - name: INTERNAL_VALUE_CONVERTER
+              value: org.apache.kafka.connect.json.JsonConverter
+            - name: KEY_CONVERTER
+              value: org.apache.kafka.connect.json.JsonConverter
+            - name: OFFSET_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: OFFSET_STORAGE_TOPIC
+              value: my_connect_offsets
+            - name: STATUS_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: STATUS_STORAGE_TOPIC
+              value: my_connect_statuses
+            - name: VALUE_CONVERTER
+              value: org.apache.kafka.connect.json.JsonConverter
+          image: debezium/connect:1.8
+          name: debezium
+          ports:
+            - containerPort: 8083
+          resources: {}
+          volumeMounts:
+            - mountPath: /debezium/config/debezium-config.json
+              name: debezium-claim0
+      restartPolicy: Always
+      volumes:
+        - name: debezium-claim0
+          persistentVolumeClaim:
+            claimName: debezium-claim0
+status: {}

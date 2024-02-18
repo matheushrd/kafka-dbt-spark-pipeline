@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.26.0 (40646f47)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: kafka-ui
+  name: kafka-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: kafka-ui
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert
+        kompose.version: 1.26.0 (40646f47)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/spark-network: "true"
+        io.kompose.service: kafka-ui
+    spec:
+      containers:
+        - env:
+            - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
+              value: "$(KAFKA_SERVICE_HOST):$(KAFKA_SERVICE_PORT)"
+            - name: KAFKA_CLUSTERS_0_NAME
+              value: teste_damasceno
+            - name: KAFKA_CLUSTERS_0_ZOOKEEPER
+              value: "$(ZOOKEEPER_SERVICE_HOST):$(ZOOKEEPER_SERVICE_PORT)"
+            - name: KAFKA_UI_HOSTNAME
+              value: http://localhost:8080
+          image: provectuslabs/kafka-ui
+          name: kafka-ui
+          ports:
+            - containerPort: 8080
+          resources: {}
+      restartPolicy: Always
+status: {}

@@ -30,7 +30,7 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://kafka-service.default.svc.cluster.local:9093
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
       - KAFKA_CONNECT_PLUGIN_PATH=/home/kafka/pluginss
       - KAFKA_CONNECT_CONFLUENT_SUPPORT_METRICS_ENABLE=false
@@ -63,23 +63,23 @@ services:
       spark-network:
         ipv4_address: 172.18.0.4
 
-  # kafka-ui:
-  #   image: provectuslabs/kafka-ui
-  #   container_name: kafka-ui
-  #   depends_on:
-  #     - kafka
-  #     - zookeeper
-  #   ports:
-  #     - 8080:8080
-  #   restart: always
-  #   environment:
-  #     - KAFKA_CLUSTERS_0_NAME=teste_damasceno
-  #     - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-  #     - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
-  #     - KAFKA_UI_HOSTNAME=http://localhost:8080
-  #   networks:
-  #     spark-network:
-  #       ipv4_address: 172.18.0.5
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+      - zookeeper
+    ports:
+      - 8080:8080
+    restart: always
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=teste_damasceno
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+      - KAFKA_UI_HOSTNAME=http://localhost:8080
+    networks:
+      spark-network:
+        ipv4_address: 172.18.0.5
 
   debezium:
     container_name: debezium
